@@ -1,8 +1,8 @@
 import { createSchema } from 'graphql-yoga'
-import { container } from '../src/infrastructure/di/container'
+import { container } from './infrastructure/di/container.js'
 
 export const schema = createSchema({
-  typeDefs: `
+  typeDefs: `#graphql
     type Projection {
       id: ID!
       title: String!
