@@ -1,10 +1,10 @@
-import { useState, useRef } from 'react'
-import { useQuery, useMutation, gql } from '@apollo/client'
+import { useRef } from 'preact/hooks'
+import { useQuery, useMutation } from 'urql'
 import cronstrue from 'cronstrue'
-import styles from './ProjectionsAdmin.module.scss'
+import useProjectionsStore from '../../store/projections'
 import { Importer } from '../Importer'
 
-const GET_PROJECTIONS = gql`
+const GET_PROJECTIONS = `
   query GetProjections {
     projections {
       id
@@ -16,163 +16,152 @@ const GET_PROJECTIONS = gql`
   }
 `
 
-const ADD_PROJECTION = gql`
+const ADD_PROJECTION = `
   mutation AddProjection($title: String!, $value: Float!, $cron: String!, $createdAt: String) {
     addProjection(title: $title, value: $value, cron: $cron, createdAt: $createdAt) {
       id
-      title
-      value
-      cron
-      createdAt
     }
   }
 `
 
-const DELETE_PROJECTION = gql`
+const DELETE_PROJECTION = `
   mutation DeleteProjection($id: ID!) {
     deleteProjection(id: $id)
   }
 `
 
-const CLEAR_PROJECTIONS = gql`
+const CLEAR_PROJECTIONS = `
   mutation ClearProjections {
     clearProjections
   }
 `
 
-export const ProjectionsAdmin = () => {
-  const DEFAULT_CRON = "0 0 1 * *"
-  const [shown, setShown] = useState(true)
-  const [importerOn, setImporterOn] = useState(false)
-  const [newProjection, setNewProjection] = useState({
-    title: "",
-    value: 0,
-    cron: DEFAULT_CRON,
-    createdAt: null
-  })
-  
-  const titleRef = useRef()
-  const { loading, error, data } = useQuery(GET_PROJECTIONS)
-  const [addProjection] = useMutation(ADD_PROJECTION, {
-    refetchQueries: [{ query: GET_PROJECTIONS }]
-  })
-  const [deleteProjection] = useMutation(DELETE_PROJECTION, {
-    refetchQueries: [{ query: GET_PROJECTIONS }]
-  })
-  const [clearProjections] = useMutation(CLEAR_PROJECTIONS, {
-    refetchQueries: [{ query: GET_PROJECTIONS }]
-  })
+export function ProjectionsAdmin() {
+  const {
+    shown,
+    importerShown,
+    newProjection,
+    toggleShown,
+    toggleImporter,
+    setNewProjection,
+    resetNewProjection
+  } = useProjectionsStore()
 
-  const resetForm = () => {
-    setNewProjection({
-      title: "",
-      value: 0,
-      cron: DEFAULT_CRON,
-      createdAt: null
-    })
-    titleRef.current?.focus()
-  }
+  const titleRef = useRef()
+  const [{ data, fetching, error }] = useQuery({ query: GET_PROJECTIONS })
+  const [, addProjection] = useMutation(ADD_PROJECTION)
+  const [, deleteProjection] = useMutation(DELETE_PROJECTION)
+  const [, clearProjections] = useMutation(CLEAR_PROJECTIONS)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    await addProjection({
-      variables: newProjection
-    })
-    resetForm()
+    const result = await addProjection(newProjection)
+    if (!result.error) {
+      resetNewProjection()
+      titleRef.current?.focus()
+    }
   }
 
   const handleDelete = async (id) => {
-    const projection = data.projections.find(p => p.id === id)
-    await deleteProjection({ variables: { id } })
-    setNewProjection(projection)
+    await deleteProjection({ id })
   }
 
-  if (loading) return <div>Loading...</div>
-  if (error) return <div>Error: {error.message}</div>
+  if (fetching) return <div class="text-center py-4">Loading...</div>
+  if (error) return <div class="text-red-500 py-4">Error: {error.message}</div>
 
   return (
-    <>
-      <div className={styles.projectionsAdmin} id="projections-admin">
-        <h3>Projections</h3>
-        <button onClick={() => setShown(!shown)}>{shown ? "Hide" : "Show"} List</button>
-        <button onClick={() => setImporterOn(!importerOn)}>
-          {importerOn ? "Hide" : "Show"} Importer
-        </button>
-        
-        {shown && (
-          <div>
-            <h4>
-              Add Projection{" "}
-              <span>
-                <span
-                  className={`${styles.closebtn} ${styles.smaller}`}
-                  onClick={() => clearProjections()}
-                >
-                  &times; clear all
-                </span>
-              </span>
-            </h4>
-            
-            <form className={styles.inputGrid} onSubmit={handleSubmit}>
-              <div>
-                <input
-                  ref={titleRef}
-                  type="text"
-                  value={newProjection.title}
-                  onChange={(e) => setNewProjection({...newProjection, title: e.target.value})}
-                  placeholder="Title"
-                />
-                <span className={styles.closebtn} onClick={resetForm}>
-                  &times;
-                </span>
-              </div>
-              
-              <div>
-                <input
-                  type="number"
-                  value={newProjection.value}
-                  onChange={(e) => setNewProjection({...newProjection, value: Number(e.target.value)})}
-                  placeholder="Value"
-                />
-              </div>
-              
-              <div>
-                <input
-                  type="text"
-                  value={newProjection.cron}
-                  onChange={(e) => setNewProjection({...newProjection, cron: e.target.value})}
-                  placeholder="Cron"
-                />
-              </div>
-              
-              <div>
-                <button className="submit" type="submit">
-                  Add Projection
-                </button>
-              </div>
-
-              <div style={{ gridColumn: "span 2" }}></div>
-              <div>{cronstrue.toString(newProjection.cron || DEFAULT_CRON)}</div>
-            </form>
-
-            <ul>
-              {data.projections.map((projection) => (
-                <li key={projection.id}>
-                  {projection.value} "{projection.title}"{" "}
-                  {cronstrue.toString(projection.cron).replace("At 12:00 AM,", "")}
-                  <button
-                    className={`${styles.linkbtn} ${styles.closebtn}`}
-                    onClick={() => handleDelete(projection.id)}
-                  >
-                    &times;
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+    <div class="mt-8 bg-white p-6 rounded-lg shadow-sm">
+      <div class="flex justify-between items-center mb-6">
+        <h3 class="text-2xl font-semibold">Projections</h3>
+        <div>
+          <button onClick={toggleShown} class="btn btn-primary mr-2">
+            {shown ? "Hide" : "Show"} List
+          </button>
+          <button onClick={toggleImporter} class="btn btn-primary">
+            {importerShown ? "Hide" : "Show"} Importer
+          </button>
+        </div>
       </div>
-      {importerOn && <Importer cron={newProjection.cron} />}
-    </>
+
+      {shown && (
+        <div>
+          <div class="flex justify-between items-center mb-4">
+            <h4 class="text-xl font-medium">Add Projection</h4>
+            <button
+              onClick={() => clearProjections()}
+              class="text-red-600 hover:text-red-700 text-sm"
+            >
+              × clear all
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit} class="grid grid-cols-4 gap-4">
+            <div class="col-span-2">
+              <input
+                ref={titleRef}
+                type="text"
+                class="input w-full"
+                value={newProjection.title}
+                onInput={(e) => setNewProjection({...newProjection, title: e.target.value})}
+                placeholder="Title"
+              />
+            </div>
+            
+            <div>
+              <input
+                type="number"
+                class="input w-full"
+                value={newProjection.value}
+                onInput={(e) => setNewProjection({...newProjection, value: Number(e.target.value)})}
+                placeholder="Value"
+              />
+            </div>
+            
+            <div>
+              <input
+                type="text"
+                class="input w-full"
+                value={newProjection.cron}
+                onInput={(e) => setNewProjection({...newProjection, cron: e.target.value})}
+                placeholder="Cron"
+              />
+            </div>
+
+            <div class="col-span-2">
+              <p class="text-sm text-gray-600">
+                {cronstrue.toString(newProjection.cron)}
+              </p>
+            </div>
+
+            <div class="col-span-2">
+              <button type="submit" class="btn btn-primary">
+                Add Projection
+              </button>
+            </div>
+          </form>
+
+          <ul class="mt-6 space-y-2">
+            {data?.projections.map((projection) => (
+              <li key={projection.id} class="flex justify-between items-center py-2 border-b">
+                <span>
+                  {projection.value} "{projection.title}"{" "}
+                  <span class="text-gray-600">
+                    {cronstrue.toString(projection.cron).replace("At 12:00 AM,", "")}
+                  </span>
+                </span>
+                <button
+                  onClick={() => handleDelete(projection.id)}
+                  class="text-red-600 hover:text-red-700"
+                >
+                  ×
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {importerShown && <Importer />}
+    </div>
   )
 }

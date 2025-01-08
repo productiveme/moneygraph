@@ -1,30 +1,50 @@
-import express from 'express'
-import { ApolloServer } from '@apollo/server'
-import { expressMiddleware } from '@apollo/server/express4'
-import cors from 'cors'
+import Fastify from 'fastify'
+import cors from '@fastify/cors'
+import { createYoga } from 'graphql-yoga'
 import mongoose from 'mongoose'
-import { typeDefs } from './schema.js'
-import { resolvers } from './resolvers.js'
+import { schema } from './schema.js'
 
-const app = express()
-const PORT = 4000
+const fastify = Fastify({
+  logger: true
+})
 
 // Connect to MongoDB
-mongoose.connect('mongodb://localhost:27017/moneygraph')
+await mongoose.connect('mongodb://localhost:27017/moneygraph')
   .then(() => console.log('Connected to MongoDB'))
   .catch(err => console.error('MongoDB connection error:', err))
 
-const server = new ApolloServer({
-  typeDefs,
-  resolvers,
+// Setup CORS
+await fastify.register(cors, {
+  origin: true
 })
 
-await server.start()
+// Create Yoga instance
+const yoga = createYoga({ schema })
 
-app.use(cors())
-app.use(express.json())
-app.use('/graphql', expressMiddleware(server))
+// Register GraphQL endpoint
+fastify.route({
+  url: '/graphql',
+  method: ['GET', 'POST', 'OPTIONS'],
+  handler: async (req, reply) => {
+    const response = await yoga.handleNodeRequest(req, {
+      req,
+      reply
+    })
+    
+    response.headers.forEach((value, key) => {
+      reply.header(key, value)
+    })
 
-app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}/graphql`)
+    reply.status(response.status)
+    reply.send(response.body)
+  }
 })
+
+// Start server
+try {
+  await fastify.listen({ port: 4000 })
+  console.log('Server running at http://localhost:4000/graphql')
+} catch (err) {
+  fastify.log.error(err)
+  process.exit(1)
+}

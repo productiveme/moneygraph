@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { useQuery, gql } from '@apollo/client'
+import { useEffect } from 'preact/hooks'
+import { useQuery } from 'urql'
 import dayjs from 'dayjs'
 import { parseCronExpression } from 'cron-schedule'
 import { Line } from 'react-chartjs-2'
@@ -15,7 +15,7 @@ import {
   TimeScale
 } from 'chart.js'
 import 'chartjs-adapter-dayjs-4'
-import styles from './Graph.module.scss'
+import useProjectionsStore from '../../store/projections'
 
 ChartJS.register(
   CategoryScale,
@@ -28,7 +28,7 @@ ChartJS.register(
   TimeScale
 )
 
-const GET_PROJECTIONS = gql`
+const GET_PROJECTIONS = `
   query GetProjections {
     projections {
       id
@@ -40,22 +40,24 @@ const GET_PROJECTIONS = gql`
   }
 `
 
-export const Graph = ({
-  start = { date: new Date(), value: 0 },
-  end = { date: dayjs().add(3, 'month').toDate(), goal: 0 }
-}) => {
-  const [startDate, setStartDate] = useState(start.date)
-  const [startValue, setStartValue] = useState(start.value)
-  const [endDate, setEndDate] = useState(end.date)
-  const [endGoal, setEndGoal] = useState(end.goal)
-  const [graphData, setGraphData] = useState({ labels: [], datasets: [] })
+export function Graph() {
+  const {
+    startDate,
+    startValue,
+    endDate,
+    endGoal,
+    setEndDate,
+    setStartValue,
+    setEndGoal
+  } = useProjectionsStore()
 
-  const { loading, error, data } = useQuery(GET_PROJECTIONS)
+  const [result] = useQuery({ query: GET_PROJECTIONS })
+  const { data, fetching, error } = result
 
-  useEffect(() => {
-    if (!data) return
+  const calculateGraphData = (projections) => {
+    if (!projections) return { labels: [], datasets: [] }
 
-    const projectionsWithDates = data.projections.map((projection) => {
+    const projectionsWithDates = projections.map((projection) => {
       const cron = parseCronExpression(projection.cron)
       let dates = [cron.getNextDate(startDate)]
       while (dates[dates.length - 1] < endDate) {
@@ -99,28 +101,34 @@ export const Graph = ({
         }
       }, [])
 
-    setGraphData({
+    return {
       labels: appliedValues.map((v) => v.x),
       datasets: [
         {
           label: 'Projections',
           data: appliedValues.map((itm) => itm.y || 0),
+          borderColor: '#10B981',
+          tension: 0.1
         },
         {
           label: 'Goal',
           data: appliedValues.map(() => endGoal),
-          pointStyle: false,
+          borderColor: '#6366F1',
+          borderDash: [5, 5],
+          pointStyle: false
         },
       ],
-    })
-  }, [data, startDate, startValue, endDate, endGoal])
+    }
+  }
 
-  if (loading) return <div>Loading...</div>
-  if (error) return <div>Error: {error.message}</div>
+  if (fetching) return <div class="text-center py-4">Loading...</div>
+  if (error) return <div class="text-red-500 py-4">Error: {error.message}</div>
+
+  const graphData = calculateGraphData(data?.projections)
 
   return (
-    <>
-      <div style={{ width: '99%' }}>
+    <div class="bg-white p-6 rounded-lg shadow-sm">
+      <div class="h-[400px]">
         <Line
           data={graphData}
           options={{
@@ -137,36 +145,38 @@ export const Graph = ({
           }}
         />
       </div>
-      <div className={styles.graphControls}>
-        <button onClick={() => setEndDate(dayjs(endDate).subtract(1, 'month').toDate())}>
+      <div class="grid grid-cols-6 gap-4 mt-6">
+        <button
+          onClick={() => setEndDate(dayjs(endDate).subtract(1, 'month').toDate())}
+          class="btn btn-primary"
+        >
           -
         </button>
-        <div></div>
-        <span>
-          Start Value:{' '}
+        <div class="col-span-2">
+          <label class="block text-sm font-medium text-gray-700">Start Value</label>
           <input
             type="number"
-            name="startValue"
+            class="input w-full mt-1"
             value={startValue}
-            onChange={(e) => setStartValue(Number(e.target.value))}
-            placeholder="Start Value"
+            onInput={(e) => setStartValue(Number(e.target.value))}
           />
-        </span>
-        <span>
-          Goal:{' '}
+        </div>
+        <div class="col-span-2">
+          <label class="block text-sm font-medium text-gray-700">Goal</label>
           <input
             type="number"
-            name="goal"
+            class="input w-full mt-1"
             value={endGoal}
-            onChange={(e) => setEndGoal(Number(e.target.value))}
-            placeholder="Goal"
+            onInput={(e) => setEndGoal(Number(e.target.value))}
           />
-        </span>
-        <div></div>
-        <button onClick={() => setEndDate(dayjs(endDate).add(1, 'month').toDate())}>
+        </div>
+        <button
+          onClick={() => setEndDate(dayjs(endDate).add(1, 'month').toDate())}
+          class="btn btn-primary"
+        >
           +
         </button>
       </div>
-    </>
+    </div>
   )
 }

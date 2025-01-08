@@ -1,11 +1,14 @@
 import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import preact from '@preact/preset-vite'
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [preact()],
   server: {
     proxy: {
       '/graphql': 'http://localhost:4000'
     }
+  },
+  esbuild: {
+    logOverride: { 'this-is-undefined-in-esm': 'silent' }
   }
 })

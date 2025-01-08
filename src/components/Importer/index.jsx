@@ -1,9 +1,9 @@
-import { useState, useRef } from 'react'
-import { useMutation, gql } from '@apollo/client'
+import { useState, useRef } from 'preact/hooks'
+import { useMutation } from 'urql'
 import yamlParser from 'js-yaml'
-import styles from './Importer.module.scss'
+import useProjectionsStore from '../../store/projections'
 
-const IMPORT_PROJECTIONS = gql`
+const IMPORT_PROJECTIONS = `
   mutation ImportProjections($projections: [ProjectionInput!]!) {
     importProjections(projections: $projections) {
       id
@@ -14,19 +14,17 @@ const IMPORT_PROJECTIONS = gql`
   }
 `
 
-export const Importer = ({ reverseSign = true, cron = "" }) => {
+export function Importer() {
   const [yaml, setYaml] = useState("")
-  const [reverseSignOn, setReverseSignOn] = useState(reverseSign)
+  const [reverseSignOn, setReverseSignOn] = useState(true)
   const textareaRef = useRef(null)
-  
-  const [importProjections] = useMutation(IMPORT_PROJECTIONS, {
-    refetchQueries: ['GetProjections']
-  })
+  const { newProjection } = useProjectionsStore()
+  const [, importProjections] = useMutation(IMPORT_PROJECTIONS)
 
   const importYaml = async (e) => {
     e.preventDefault()
     
-    function getNumberKeyValues(obj, defaultCron = cron) {
+    function getNumberKeyValues(obj, defaultCron = newProjection.cron) {
       const result = []
       const pushItem = (key, value, cron) =>
         result.push({ title: key, value: reverseSignOn ? value * -1 : value, cron })
@@ -63,9 +61,7 @@ export const Importer = ({ reverseSign = true, cron = "" }) => {
       const data = yamlParser.load(yaml)
       const projections = getNumberKeyValues(data)
       
-      await importProjections({
-        variables: { projections }
-      })
+      await importProjections({ projections })
       
       setYaml("")
       textareaRef.current.value = ""
@@ -75,29 +71,32 @@ export const Importer = ({ reverseSign = true, cron = "" }) => {
   }
 
   return (
-    <>
-      <h3>Import Projections</h3>
-      <p>Import title / value pairs from a YAML file</p>
-      <form className={styles.centered} onSubmit={importYaml}>
+    <div class="mt-8 border-t pt-8">
+      <h3 class="text-xl font-semibold mb-2">Import Projections</h3>
+      <p class="text-gray-600 mb-4">Import title / value pairs from a YAML file</p>
+      <form onSubmit={importYaml} class="space-y-4">
         <textarea
           ref={textareaRef}
+          class="w-full h-40 input font-mono"
           placeholder="Import YAML here"
           onChange={(e) => setYaml(e.target.value)}
           value={yaml}
         />
-        <div>
-          <label>
+        <div class="flex items-center space-x-4">
+          <label class="flex items-center space-x-2">
             <input
               type="checkbox"
-              name="reverseSign"
+              class="rounded text-blue-600"
               checked={reverseSignOn}
               onChange={(e) => setReverseSignOn(e.target.checked)}
             />
-            Reverse sign for imported values
+            <span class="text-sm text-gray-700">Reverse sign for imported values</span>
           </label>
-          <button className="submit">Import</button>
+          <button type="submit" class="btn btn-primary">
+            Import
+          </button>
         </div>
       </form>
-    </>
+    </div>
   )
 }
