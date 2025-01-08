@@ -1,0 +1,52 @@
+.projections-admin {
+
+	button {
+		margin: 0.2em 0.5em;
+
+		&.linkbtn {
+			background: none;
+			color: inherit;
+			border: none;
+			padding: 0;
+			font: inherit;
+			cursor: pointer;
+		}
+	}
+
+	.closebtn {
+		cursor: pointer;
+		color: red !important;
+	}
+
+	.smaller {
+		font-size: 0.8em;
+	}
+
+	input[type="text"],
+	input[type="number"],
+	select {
+		/* margin: 1em; */
+		width: 100%;
+		font-size: 1.2em;
+	}
+
+	.input-grid {
+		display: grid;
+		/* Adjust the number of columns as needed */
+		grid-template-columns: 3fr 1fr 2fr 1fr;
+		grid-template-rows: auto auto;
+		grid-gap: 0.2em;
+		width: 100%;
+
+		&>div {
+			display: flex;
+		}
+
+	}
+
+	@media (max-width: 768px) {
+		.input-grid {
+			grid-template-columns: 2fr 1fr;
+		}
+	}
+}

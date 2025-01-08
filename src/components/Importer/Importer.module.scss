@@ -1,0 +1,11 @@
+.centered {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  textarea {
+    width: 99%;
+    height: 10em;
+  }
+}
